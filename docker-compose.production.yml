@@ -76,7 +76,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      - redis-proxy
+      redis-proxy:
+        condition: service_started
 
   frontend:
     image: node:22-alpine
