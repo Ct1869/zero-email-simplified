@@ -1,108 +1,123 @@
-import type { ThinkingMCP, ThreadSyncWorker, WorkflowRunner, ZeroDB, ZeroMCP } from './main';
-import type { ShardRegistry, ZeroAgent, ZeroDriver } from './routes/agent';
-
-import { env as _env } from 'cloudflare:workers';
-import type { QueryableHandler } from 'dormroom';
+// Simplified environment variables - no Cloudflare Workers dependencies
 
 export type ZeroEnv = {
-  ZERO_DRIVER: DurableObjectNamespace<ZeroDriver & QueryableHandler>;
-  SHARD_REGISTRY: DurableObjectNamespace<ShardRegistry & QueryableHandler>;
-  ZERO_DB: DurableObjectNamespace<ZeroDB>;
-  ZERO_AGENT: DurableObjectNamespace<ZeroAgent>;
-  ZERO_MCP: DurableObjectNamespace<ZeroMCP & QueryableHandler>;
-  THINKING_MCP: DurableObjectNamespace<ThinkingMCP & QueryableHandler>;
-  WORKFLOW_RUNNER: DurableObjectNamespace<WorkflowRunner & QueryableHandler>;
-
-  THREAD_SYNC_WORKER: DurableObjectNamespace<ThreadSyncWorker>;
-  SYNC_THREADS_WORKFLOW: Workflow;
-  SYNC_THREADS_COORDINATOR_WORKFLOW: Workflow;
-  HYPERDRIVE: { connectionString: string };
-  pending_emails_status: KVNamespace;
-  pending_emails_payload: KVNamespace;
-  scheduled_emails: KVNamespace;
-  send_email_queue: Queue;
-  snoozed_emails: KVNamespace;
-  gmail_sub_age: KVNamespace;
-  subscribe_queue: Queue;
-  AI: Ai;
-  gmail_history_id: KVNamespace;
-  gmail_processing_threads: KVNamespace;
-  subscribed_accounts: KVNamespace;
-  connection_labels: KVNamespace;
-  prompts_storage: KVNamespace;
+  // Core Application
   NODE_ENV: 'local' | 'development' | 'production';
-  JWT_SECRET: 'secret';
-  ELEVENLABS_API_KEY: '1234567890';
-  DISABLE_CALLS: 'true' | '';
-  DROP_AGENT_TABLES: 'false';
-  THREAD_SYNC_MAX_COUNT: '5' | '20' | '10';
-  THREAD_SYNC_LOOP: 'false' | 'true';
-  DISABLE_WORKFLOWS: 'true';
-  AUTORAG_ID: '';
-  USE_OPENAI: 'true';
-  CLOUDFLARE_ACCOUNT_ID: '';
-  CLOUDFLARE_API_TOKEN: '';
-  BASE_URL: string;
+  PORT: string;
   VITE_PUBLIC_APP_URL: string;
+  VITE_PUBLIC_BACKEND_URL: string;
+  
+  // Database
   DATABASE_URL: string;
+  
+  // Authentication
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
+  COOKIE_DOMAIN: string;
+  BETTER_AUTH_TRUSTED_ORIGINS?: string;
+  
+  // Google OAuth (Gmail)
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
-  RESEND_API_KEY: string;
-  VITE_PUBLIC_POSTHOG_KEY: string;
-  VITE_PUBLIC_POSTHOG_HOST: string;
-  COOKIE_DOMAIN: string;
-  BETTER_AUTH_TRUSTED_ORIGINS: string;
-  GITHUB_CLIENT_ID: string;
-  GITHUB_CLIENT_SECRET: string;
-  GOOGLE_REDIRECT_URI: string;
-  GOOGLE_APPLICATION_CREDENTIALS: string;
-  HISTORY_OFFSET: string;
-  ZERO_CLIENT_ID: string;
-  ZERO_CLIENT_SECRET: string;
-  VITE_PUBLIC_BACKEND_URL: string;
+  GOOGLE_REDIRECT_URI?: string;
+  
+  // Microsoft OAuth (Outlook)
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  
+  // Proton Mail
+  PROTON_APP_PASSWORD?: string;
+  
+  // Redis
   REDIS_URL: string;
   REDIS_TOKEN: string;
-  OPENAI_API_KEY: string;
-  BRAIN_URL: string;
-  COMPOSIO_API_KEY: string;
-  GROQ_API_KEY: string;
-  EARLY_ACCESS_ENABLED: string;
-  GOOGLE_GENERATIVE_AI_API_KEY: string;
-  AUTUMN_SECRET_KEY: string;
-  AI_SYSTEM_PROMPT: string;
-  PERPLEXITY_API_KEY: string;
-  TWILIO_ACCOUNT_SID: string;
-  TWILIO_AUTH_TOKEN: string;
-  TWILIO_PHONE_NUMBER: string;
-  VITE_PUBLIC_ELEVENLABS_AGENT_ID: string;
-  REACT_SCAN: string;
-  MICROSOFT_CLIENT_ID: string;
-  MICROSOFT_CLIENT_SECRET: string;
-  VOICE_SECRET: string;
-  ARCADE_API_KEY: string;
-  OPENAI_MODEL: string;
-  OPENAI_MINI_MODEL: string;
-  ANTHROPIC_API_KEY: string;
-  GOOGLE_S_ACCOUNT: string;
-  AXIOM_API_TOKEN: string;
-  AXIOM_DATASET: string;
-  THREADS_BUCKET: R2Bucket;
-  thread_queue: Queue;
-  VECTORIZE: VectorizeIndex;
-  VECTORIZE_MESSAGE: VectorizeIndex;
-  DEV_PROXY: string;
-  MEET_AUTH_HEADER: string;
-  MEET_API_URL: string;
-  ENABLE_MEET: 'true' | 'false';
-  OTEL_EXPORTER_OTLP_ENDPOINT?: string;
-  OTEL_EXPORTER_OTLP_HEADERS?: string;
-  OTEL_SERVICE_NAME?: string;
-  DD_API_KEY: string;
-  DD_APP_KEY: string;
-  DD_SITE: string;
+  
+  // Email Sending (Optional)
+  RESEND_API_KEY?: string;
+  
+  // Encryption (Optional)
+  AUTUMN_SECRET_KEY?: string;
+  
+  // Analytics (Optional)
+  VITE_PUBLIC_POSTHOG_KEY?: string;
+  VITE_PUBLIC_POSTHOG_HOST?: string;
+  AXIOM_API_TOKEN?: string;
+  AXIOM_DATASET?: string;
+  
+  // GitHub OAuth (Optional)
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+  
+  // Meet Integration (Optional)
+  MEET_AUTH_HEADER?: string;
+  MEET_API_URL?: string;
+  ENABLE_MEET?: 'true' | 'false';
+  
+  // Development
+  REACT_SCAN?: string;
+  DEV_PROXY?: string;
 };
 
-const env = _env as ZeroEnv;
-export { env };
+// Get environment variables from process.env
+export const env: ZeroEnv = {
+  NODE_ENV: (process.env.NODE_ENV as ZeroEnv['NODE_ENV']) || 'development',
+  PORT: process.env.PORT || '8787',
+  VITE_PUBLIC_APP_URL: process.env.VITE_PUBLIC_APP_URL || 'http://localhost:3000',
+  VITE_PUBLIC_BACKEND_URL: process.env.VITE_PUBLIC_BACKEND_URL || 'http://localhost:8787',
+  
+  DATABASE_URL: process.env.DATABASE_URL || '',
+  
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || '',
+  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || 'localhost',
+  BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
+  
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+  GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+  
+  MICROSOFT_CLIENT_ID: process.env.MICROSOFT_CLIENT_ID,
+  MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
+  
+  PROTON_APP_PASSWORD: process.env.PROTON_APP_PASSWORD,
+  
+  REDIS_URL: process.env.REDIS_URL || 'http://localhost:8079',
+  REDIS_TOKEN: process.env.REDIS_TOKEN || 'upstash-local-token',
+  
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  AUTUMN_SECRET_KEY: process.env.AUTUMN_SECRET_KEY,
+  
+  VITE_PUBLIC_POSTHOG_KEY: process.env.VITE_PUBLIC_POSTHOG_KEY,
+  VITE_PUBLIC_POSTHOG_HOST: process.env.VITE_PUBLIC_POSTHOG_HOST,
+  AXIOM_API_TOKEN: process.env.AXIOM_API_TOKEN,
+  AXIOM_DATASET: process.env.AXIOM_DATASET,
+  
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+  
+  MEET_AUTH_HEADER: process.env.MEET_AUTH_HEADER,
+  MEET_API_URL: process.env.MEET_API_URL,
+  ENABLE_MEET: process.env.ENABLE_MEET as 'true' | 'false' | undefined,
+  
+  REACT_SCAN: process.env.REACT_SCAN,
+  DEV_PROXY: process.env.DEV_PROXY,
+};
+
+// Validate required environment variables
+const requiredVars = [
+  'DATABASE_URL',
+  'BETTER_AUTH_SECRET',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'REDIS_URL',
+  'REDIS_TOKEN',
+] as const;
+
+for (const varName of requiredVars) {
+  if (!env[varName]) {
+    console.warn(`⚠️  Warning: Required environment variable ${varName} is not set`);
+  }
+}
+
+export default env;
+
