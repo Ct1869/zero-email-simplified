@@ -15,6 +15,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - "coolify.managed=true"
 
   redis:
     image: redis:7-alpine
@@ -27,6 +29,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - "coolify.managed=true"
 
   redis-proxy:
     image: hiett/serverless-redis-http:latest
@@ -38,6 +42,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    labels:
+      - "coolify.managed=true"
 
   backend:
     image: node:22-alpine
@@ -46,47 +52,57 @@ services:
     command: sh -c "apk add --no-cache curl && corepack enable && pnpm install && cd apps/server && pnpm db:push && pnpm dev"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=${PORT:-8787}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/zerodotemail}
+      - PORT=8787
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/zerodotemail
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-https://${SERVICE_FQDN_FRONTEND}}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
-      - REDIS_URL=${REDIS_URL:-http://redis-proxy:80}
-      - REDIS_TOKEN=${REDIS_TOKEN:-upstash-local-token}
-      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
-      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL}
+      - REDIS_URL=http://redis-proxy:80
+      - REDIS_TOKEN=upstash-local-token
+      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL:-https://${SERVICE_FQDN_FRONTEND}}
+      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL:-https://${SERVICE_FQDN_BACKEND}}
     volumes:
       - .:/app
       - /app/node_modules
       - /app/apps/server/node_modules
-    ports:
-      - "8787:8787"
+    expose:
+      - "8787"
     depends_on:
       postgres:
         condition: service_healthy
       - redis-proxy
+    labels:
+      - "coolify.managed=true"
+      - "coolify.name=backend"
+      - "coolify.port=8787"
+      - "coolify.type=application"
 
   frontend:
     image: node:22-alpine
     restart: unless-stopped
     working_dir: /app
-    command: sh -c "corepack enable && pnpm install && cd apps/mail && pnpm dev"
+    command: sh -c "corepack enable && pnpm install && cd apps/mail && pnpm dev --host 0.0.0.0"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
-      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL}
+      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL:-https://${SERVICE_FQDN_FRONTEND}}
+      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL:-https://${SERVICE_FQDN_BACKEND}}
     volumes:
       - .:/app
       - /app/node_modules
       - /app/apps/mail/node_modules
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       - backend
+    labels:
+      - "coolify.managed=true"
+      - "coolify.name=frontend"
+      - "coolify.port=3000"
+      - "coolify.type=application"
 
 volumes:
   postgres_data:
