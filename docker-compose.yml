@@ -1,18 +1,13 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: zero-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: zerodotemail
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,13 +16,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis for caching and sessions
   redis:
     image: redis:7-alpine
-    container_name: zero-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -36,99 +28,77 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis HTTP Proxy (Upstash-compatible)
   redis-proxy:
     image: hiett/serverless-redis-http:latest
-    container_name: zero-redis-proxy
     restart: unless-stopped
     environment:
       SRH_MODE: env
       SRH_TOKEN: upstash-local-token
-      SRH_CONNECTION_STRING: 'redis://redis:6379'
-    ports:
-      - "8079:80"
+      SRH_CONNECTION_STRING: redis://redis:6379
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Backend API
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: zero-backend
+    image: node:22-alpine
     restart: unless-stopped
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && cd apps/server && pnpm db:push && pnpm dev"
     environment:
-      - NODE_ENV=production
-      - PORT=8787
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/zerodotemail
-      - REDIS_URL=http://redis-proxy:80
-      - REDIS_TOKEN=upstash-local-token
-      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL:-http://localhost:3000}
-      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL:-http://localhost:8787}
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-8787}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/zerodotemail}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
-      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-localhost}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
-      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
-      - PROTON_APP_PASSWORD=${PROTON_APP_PASSWORD}
-      - RESEND_API_KEY=${RESEND_API_KEY}
-      - AUTUMN_SECRET_KEY=${AUTUMN_SECRET_KEY}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
+      - REDIS_URL=${REDIS_URL:-http://redis-proxy:80}
+      - REDIS_TOKEN=${REDIS_TOKEN:-upstash-local-token}
+      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
+      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/server/node_modules
     ports:
       - "8787:8787"
     depends_on:
       postgres:
         condition: service_healthy
       redis-proxy:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8787/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Frontend Application
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: zero-frontend
+    image: node:22-alpine
     restart: unless-stopped
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && cd apps/mail && pnpm dev"
     environment:
-      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL:-http://localhost:3000}
-      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL:-http://localhost:8787}
+      - NODE_ENV=${NODE_ENV:-production}
+      - VITE_PUBLIC_APP_URL=${VITE_PUBLIC_APP_URL}
+      - VITE_PUBLIC_BACKEND_URL=${VITE_PUBLIC_BACKEND_URL}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/mail/node_modules
     ports:
       - "3000:3000"
     depends_on:
-      backend:
-        condition: service_healthy
-
-  # Nginx Reverse Proxy (Optional - for production)
-  nginx:
-    image: nginx:alpine
-    container_name: zero-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - frontend
       - backend
-    profiles:
-      - production
 
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
-
-networks:
-  default:
-    name: zero-network
-
